@@ -1,3 +1,4 @@
+import os
 # import bcrypt
 from math import log, exp, sqrt
 import numpy as np
@@ -17,10 +18,11 @@ from utils import utils as ut
 from IPython.display import display, HTML
 
 file_loc = r"data\Node_edge_data.xlsx"
-col_selection_initial = ["Įstaiga", "Informacinės sistemos sutrumpintas pavadinimas", "Informacinės sistemos pilnas pavadinimas"]
-col_selection = ["Įstaiga", "Informacinės sistemos sutrumpintas pavadinimas"]
+col_selection = {"source_col": ["Įstaiga"],
+                 "target_cols": ["Informacinės sistemos sutrumpintas pavadinimas",
+                                 "Informacinės sistemos pilnas pavadinimas"]}
 
-df = ut.network_data(file_loc)
+df = ut.network_data(file_loc, col_selection)
 
 df_edges = df.get_edges()
 df_nodes = df.get_nodes(df_edges)
@@ -29,23 +31,23 @@ dict_nodes = dict(zip(df_nodes["node_name"], df_nodes["color"]))
 
 dict_edges = df_edges["source"].tolist() + df_edges["target"].to_list()
 dict_edges = list(set(dict_edges))
-dict_edges = [(x, '#F6803D') if dict_nodes[x] == 'istaiga' else (x, "#11879D") for x in dict_edges]
+dict_edges = [(x, '#F6803D') if dict_nodes[x] == 'institution' else (x, "#11879D") for x in dict_edges]
 dict_edges = dict(dict_edges)
 
-# Create a NetworkX graph from the DataFrame
+# Creating a NetworkX graph from the DataFrame
 G_nx = nx.from_pandas_edgelist(df_edges, source='source', target='target')
 
 n_nodes = len(G_nx.nodes())
 node_distance_coef = n_nodes * 9
 node_size_coef = node_distance_coef
 
-# Generate a layout (e.g., Fruchterman Reingold layout)
+# Generating a layout
 pos = nx.spring_layout(G_nx, k=1.4 * (1 / sqrt(n_nodes)), scale=1.5)
 
-# Create a PyVis Network object
+# Creating a PyVis Network object
 G_pyvis = Network(height='1500px', width='1500px', select_menu=True, cdn_resources="remote")
 
-# Add nodes and edges from the NetworkX graph object to the PyVis Network object
+# Adding nodes and edges from the NetworkX graph object to the PyVis Network object
 for node in G_nx.nodes():
     G_pyvis.add_node(node,
                      x=pos[node][0] * node_distance_coef, y=pos[node][1] * node_distance_coef,
@@ -58,53 +60,59 @@ for node in G_nx.nodes():
 for edge in G_nx.edges():
     G_pyvis.add_edge(edge[0], edge[1], color="#F6803D")
 
+
+"""
+The following coeficients used for sigmoidal function to define the size of the node. Institutions with small count of
+information systems are made tiny compared to those that have a lot of connections.
+
+# Source: https://www.researchgate.net/figure/A-Properties-of-a-sigmoid-function-Although-many-functional-forms-exist-each-shares_fig1_257462730
+# Tested on: https://www.desmos.com/calculator
+
+"""
+
 # Add nodes and edges from the NetworkX graph object to the PyVis Network object
-
-"""
-Žemiau nurodyti koeficientai yra naudojami matematinėje funkcijojoje, kuri transformuoja 
-node dydį taip, kad išryškinti skirtumus tarm mažiausiai ryšių turinčių node ir daugiausiai
-
-Ją išsibandyti galima čia: https://www.desmos.com/calculator
-Šaltinis: https://www.researchgate.net/figure/A-Properties-of-a-sigmoid-function-Although-many-functional-forms-exist-each-shares_fig1_257462730
-
-"""
-
-A = 100  # kelia funcijos max reikšmę išlaikant slope
+A = 100
 B = 1.8
 C = 0.17
 D = 0.8
-Z = 30  # minimalus dydis
+Z = 30
 
-ut.print_min_max_node_size(G_nx, post_transformation=False)
+# ut.print_min_max_node_size(G_nx, post_transformation=False)
 
 for node in G_pyvis.nodes:
 
-    x = G_nx.degree(node['id'])  # n_informacines_sistemos - ryšių su informacinėmis sistemomis kiekis
-    node['size'] = A * exp(-exp(B - C * x / D)) + Z
+    n_IS = G_nx.degree(node['id'])  # amount of information systems (IS) that institution is connected with
+    node['size'] = A * exp(-exp(B - C * n_IS / D)) + Z
+
     node['label'] = str(node['id'])  # Set labels to node IDs
 
-    tipas = dict_nodes[node['id']]
+    node_type = dict_nodes[node['id']]  # marking the nodes type: Institution or (IS)
 
-    if dict_nodes[node['id']] == 'istaiga':
+    if dict_nodes[node['id']] == 'institution':
 
-        node['title'] = f"Tipas: {tipas}\n" \
-                        f"Pavadinimas: {node['id']}\n" \
-                        f"IS kiekis: {x}"
+        node['title'] = f"Type: {node_type}\n" \
+                        f"Name: {node['id']}\n" \
+                        f"IS count: {n_IS}"
     else:
-        node['title'] = f"Tipas: {tipas}\n" \
-                        f"Pavadinimas: {node['id']}\n"
+        node['title'] = f"Type: {node_type}\n" \
+                        f"Name: {node['id']}\n"
 
-    node['id'] = f"{dict_nodes[node['id']]} | {node['id']}"
+    node['id'] = f"{node_type} | {node['id']}"
 
 ut.print_min_max_node_size(G_pyvis, post_transformation=True)
 
 list_pos = np.concatenate(list(pos.values())).ravel().tolist()
 
-# Configure edges to be straight and have the same width
+# Defining edges
 for edge in G_pyvis.edges:
-    # Pervadinu id, pagal kuriuos braižomi edge - pridedu node tipą, kaip tai padariau ankstesniame for loop'e
-    new_from = f"{dict_nodes[edge['from']]} | {edge['from']}"
-    new_to = f"{dict_nodes[edge['to']]} | {edge['to']}"
+    # defining edge id according to source and target nodes ("node_type | node")
+    source_node_type = dict_nodes[edge['from']]
+    target_node_type = dict_nodes[edge['to']]
+
+    # defining edges
+    new_from = f"{source_node_type} | {edge['from']}"
+    new_to = f"{target_node_type} | {edge['to']}"
+
     edge["from"] = new_from
     edge["to"] = new_to
 
@@ -112,11 +120,8 @@ for edge in G_pyvis.edges:
 
 G_pyvis.toggle_physics(False)
 
-# G_pyvis.show_buttons(filter_=["nodes"])
-
 html = G_pyvis.generate_html()
-with open("outputs/RRF įstaigos ir IS_2.html", mode='w', encoding='utf-8') as fp:
+
+with open("RRF_institutions_n_information_systems.html", mode='w+', encoding='utf-8') as fp:
     fp.write(html)
-display(HTML(html))
-# Show the PyVis Network object
-# G_pyvis.show("interactive_graph.html", notebook=False, )
+

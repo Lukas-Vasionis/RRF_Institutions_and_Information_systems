@@ -5,29 +5,42 @@ import numpy as np
 
 
 class network_data:
-    def __init__(self, abs_path_to_file):
+    def __init__(self, abs_path_to_file, col_selection):
         self.abs_path_to_file = abs_path_to_file
+        self.col_selection=col_selection
+
+
 
     def get_edges(self):
-        df_edges = pd.read_excel(self.abs_path_to_file,
-                                 # sheet_name="IS statusai"
-                                 )
-        df_edges = df_edges.loc[:, ["Įstaiga", "Sutrumpintas pavadinimas", "Pilnas pavadinimas"]]
+        """
+        From the xlsx file in data folder, this function takes info about institutions and their information systems,
+        cleans it, transforms it into edge table
+        :return: pd.Dataframe, edge table
+        """
 
-        # 1st cleaning
+        # data import
+        df_edges = pd.read_excel(self.abs_path_to_file,
+                                 )
+        # column selection
+        cols_source_target = self.col_selection["source_col"] + self.col_selection["target_cols"]
+        df_edges = df_edges.loc[:, cols_source_target]
+
+        # cleaning values from white space characters
         df_edges = df_edges.replace(to_replace=r"^(\s|\\n)|(\s|\\n)$|", value="", regex=True)
 
+        # Cleaning strings that are shorter than 2 symbols
         for column in df_edges.columns:
             df_edges[column] = df_edges[column].apply(lambda x: np.nan if len(str(x)) < 2 else x)
 
-        # Transforming values and columns
-        df_edges.loc[:, "Pilnas pavadinimas_coalesce"] = df_edges.loc[:,
-                                                         ["Pilnas pavadinimas", "Sutrumpintas pavadinimas"]].bfill(
+        # Getting single target column by Coalescing who columns - name of informatin system, full name of information system
+        target_cols = self.col_selection["target_cols"]
+        df_edges.loc[:, "target"] = df_edges.loc[:, target_cols].bfill(
             axis=1).iloc[:, 0]
-        df_edges = df_edges.loc[:, ["Įstaiga", "Pilnas pavadinimas_coalesce"]]
+
+        df_edges = df_edges.loc[:, ["Įstaiga", "target"]]
         df_edges.columns = ["source", "target"]
 
-        # 2nd cleaning
+        # additional cleaning
         df_edges = df_edges.loc[df_edges["source"] != df_edges['target'], :]
         df_edges = df_edges.drop_duplicates()
         df_edges = df_edges.dropna(how='any', axis=0)
@@ -35,21 +48,33 @@ class network_data:
         return df_edges
 
     def get_nodes(self, df_edges):
+        """
+        Getting nodes table from edge table and defining the nodes
+
+        :param df_edges:
+        :return: pd.Dataframe, node table
+        """
         df_nodes = df_edges.loc[:, ["source", "target"]]
         df_nodes['color'] = ""
 
+        # Creating node_table:
+            # For source and target columns:
+                # select "source" or "target" column,
+                # rename it into node_name,
+                # assigning value for color "institution" or "information system"
+
         df_nodes_source = df_nodes.loc[:, ["source", "color"]]
         df_nodes_source.rename(columns={"source": "node_name"}, inplace=True)
-        df_nodes_source["color"] = 'istaiga'
+        df_nodes_source["color"] = 'institution'
 
         df_nodes_target = df_nodes.loc[:, ["target", "color"]]
         df_nodes_target.rename(columns={"target": "node_name"}, inplace=True)
-        df_nodes_target["color"] = 'sistema'
+        df_nodes_target["color"] = 'information_system'
 
+        # Concating both node tables and dropping the duplicates
         df_nodes_concated = pd.concat([
             df_nodes_source, df_nodes_target
         ])
-
         df_nodes_concated = df_nodes_concated.drop_duplicates(subset='node_name')
 
         return df_nodes_concated
