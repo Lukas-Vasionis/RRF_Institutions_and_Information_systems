@@ -16,17 +16,9 @@ import pyvis
 from utils import utils as ut
 from IPython.display import display, HTML
 
-# Create a pandas DataFrame with edges (you can load your own data here)
-# file_loc = r"C:\Users\lukasva\Desktop\Darbai\RRF\LIMS sistemos\Elektrėnu ligonine\uzklausa_2.xlsx"
-# col_selection = ["table", "referenced_table"]
-# file_loc = r"C:\Users\lukasva\Desktop\Darbai\RRF\HI\priklausomybiu_gydymai\ASIS.xlsx"
-# col_selection=["table","referenced_table"]
-# file_loc = r"C:\Users\lukasva\Desktop\Darbai\RRF\Janos užduotis\ryšiai.xlsx"
-# col_selection = ["Įstaiga", "Pilnas pavadinimas"]
-
-file_loc = r"C:\Users\lukasva\Desktop\Darbai\RRF\darbų_kontrolės_registras_03.xlsx"
-col_selection_initial = ["Įstaiga", "Sutrumpintas pavadinimas", "Pilnas pavadinimas"]
-col_selection = ["Įstaiga", "Pilnas pavadinimas"]
+file_loc = r"data\Node_edge_data.xlsx"
+col_selection_initial = ["Įstaiga", "Informacinės sistemos sutrumpintas pavadinimas", "Informacinės sistemos pilnas pavadinimas"]
+col_selection = ["Įstaiga", "Informacinės sistemos sutrumpintas pavadinimas"]
 
 df = ut.network_data(file_loc)
 
@@ -123,7 +115,7 @@ G_pyvis.toggle_physics(False)
 # G_pyvis.show_buttons(filter_=["nodes"])
 
 html = G_pyvis.generate_html()
-with open("išsiųsta janai/RRF įstaigos ir IS_2.html", mode='w', encoding='utf-8') as fp:
+with open("outputs/RRF įstaigos ir IS_2.html", mode='w', encoding='utf-8') as fp:
     fp.write(html)
 display(HTML(html))
 # Show the PyVis Network object

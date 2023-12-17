@@ -3,12 +3,15 @@ import pandas as pd
 import numpy as np
 
 
+
 class network_data:
     def __init__(self, abs_path_to_file):
         self.abs_path_to_file = abs_path_to_file
 
     def get_edges(self):
-        df_edges = pd.read_excel(self.abs_path_to_file, sheet_name="IS statusai")
+        df_edges = pd.read_excel(self.abs_path_to_file,
+                                 # sheet_name="IS statusai"
+                                 )
         df_edges = df_edges.loc[:, ["Įstaiga", "Sutrumpintas pavadinimas", "Pilnas pavadinimas"]]
 
         # 1st cleaning
